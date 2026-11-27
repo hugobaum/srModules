@@ -329,9 +329,6 @@
     return new Uint8Array(out);
   }
 
-  // 由常數直接計算 adSlotRenderer (wireType 2) 的精確 varint 標籤位元組，避免手寫誤差
-  var AD_SLOT_TAG_BYTES = encodeVarint(TAG_AD_SLOT_RENDERER * 8 + 2);
-
   function decodeFields(buf) {
     var fields = [];
     var pos = 0;
@@ -490,34 +487,22 @@
     return changed ? { changed: true, bytes: concatChunks(chunks) } : { changed: false, bytes: buf };
   }
 
-  // 檢查單一包裝項目是否只包含廣告渲染器（避免刪除卡片內容後在版面上留下空白卡片）
-  function isSingleAdWrapper(payload) {
-    var children = decodeFields(payload);
-    if (!children || children.length === 0 || children.length > 8) return false;
-
-    var hasAdChild = false;
-    for (var i = 0; i < children.length; i++) {
-      var c = children[i];
-      if (c.wireType !== 2) continue;
-      if (c.fieldNumber === TAG_AD_SLOT_RENDERER) {
-        hasAdChild = true;
-        continue;
-      }
-      if (c.fieldNumber === TAG_ELEMENT_RENDERER) {
-        if (!hasProtectedCoreMarker(c.payload) && hasFeedAdMarker(c.payload)) {
-          hasAdChild = true;
-          continue;
-        }
-        return false;
-      }
-      // 若同層還有體積較大的非廣告子節點，代表是複合容器，不可整包丟棄
-      if (c.payload.length > 512) {
+  // 判斷剔除廣告子節點後，外殼是否僅剩極小 metadata（避免在頁面上留下空白廣告卡片）
+  function isOnlyTinyMetadata(buf) {
+    if (buf.length === 0) return true;
+    if (buf.length > 256) return false;
+    var fields = decodeFields(buf);
+    if (!fields) return false;
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i].wireType === 2 && fields[i].payload.length > 128) {
         return false;
       }
     }
-    return hasAdChild;
+    return true;
   }
 
+  // 高效能 O(N) 樹狀過濾：不在中介容器重複掃描整段位元組，
+  // 僅做 varint 跳轉並針對 adSlotRenderer (424701016) 與葉節點 elementRenderer (153515154) 檢查。
   function filterFeedProtobuf(buf, depth, isReelEndpoint, stats) {
     if (depth > MAX_RECURSION_DEPTH || buf.length < 4) {
       return { changed: false, bytes: buf };
@@ -537,16 +522,16 @@
         continue;
       }
 
-      // 1. 明確 adSlotRenderer 標籤直接剔除
+      // 1. 明確 adSlotRenderer 標籤：O(1) 直接剔除
       if (f.fieldNumber === TAG_AD_SLOT_RENDERER) {
         changed = true;
         stats.removedFeedItems++;
         continue;
       }
 
-      // 2. elementRenderer 且命中嚴格廣告特徵
+      // 2. 葉節點 elementRenderer：僅對單卡小區塊掃一次廣告特徵
       if (f.fieldNumber === TAG_ELEMENT_RENDERER) {
-        if (!hasProtectedCoreMarker(f.payload) && hasFeedAdMarker(f.payload)) {
+        if (f.payload.length <= 131072 && hasFeedAdMarker(f.payload)) {
           changed = true;
           stats.removedFeedItems++;
           continue;
@@ -555,15 +540,8 @@
         continue;
       }
 
-      // 3. 單一廣告卡片外殼（如僅包裹 adSlotRenderer 的 richItemRenderer / itemSectionRenderer）
-      if (isSingleAdWrapper(f.payload)) {
-        changed = true;
-        stats.removedFeedItems++;
-        continue;
-      }
-
-      // 4. Shorts 佇列單筆項目（reel_watch_sequence）若整筆為廣告項目直接跳過
-      if (isReelEndpoint && depth <= 2 && !hasProtectedCoreMarker(f.payload)) {
+      // 3. Shorts 佇列單筆廣告項目
+      if (isReelEndpoint && depth <= 2 && f.payload.length <= 262144) {
         if (
           containsAsciiMarker(f.payload, "shorts_ad") ||
           containsAsciiMarker(f.payload, "ad_slot") ||
@@ -571,7 +549,6 @@
           containsAsciiMarker(f.payload, "googleadservices.com") ||
           containsAsciiMarker(f.payload, "pagead/")
         ) {
-          // 僅當子結構本身不含多個正常影片時才剔除單筆
           var sub = decodeFields(f.payload);
           if (sub && sub.length <= 16) {
             changed = true;
@@ -581,14 +558,17 @@
         }
       }
 
-      // 5. 只有在子位元組確實含廣告線索或可能含 adSlotRenderer 時才深入遞迴，減少 CPU 開銷
-      if (
-        f.payload.length >= 16 &&
-        (hasFeedAdMarker(f.payload) || containsAdSlotTagVarint(f.payload))
-      ) {
+      // 4. 輕量向下遞迴（純字串或非 Protobuf 欄位會在 decodeFields 第一個 tag 立即返回 null）
+      if (f.payload.length >= 8) {
         var childRes = filterFeedProtobuf(f.payload, depth + 1, isReelEndpoint, stats);
         if (childRes.changed) {
           changed = true;
+          if (
+            childRes.bytes.length === 0 ||
+            (f.payload.length <= 131072 && isOnlyTinyMetadata(childRes.bytes))
+          ) {
+            continue;
+          }
           chunks.push(rebuildLengthDelimitedField(f.rawTag, childRes.bytes));
           continue;
         }
@@ -598,22 +578,6 @@
     }
 
     return changed ? { changed: true, bytes: concatChunks(chunks) } : { changed: false, bytes: buf };
-  }
-
-  function containsAdSlotTagVarint(buf) {
-    var tLen = AD_SLOT_TAG_BYTES.length;
-    var limit = buf.length - tLen;
-    for (var i = 0; i <= limit; i++) {
-      var matched = true;
-      for (var j = 0; j < tLen; j++) {
-        if (buf[i + j] !== AD_SLOT_TAG_BYTES[j]) {
-          matched = false;
-          break;
-        }
-      }
-      if (matched) return true;
-    }
-    return false;
   }
 
   function filterGetWatchProtobuf(buf, depth, stats) {
