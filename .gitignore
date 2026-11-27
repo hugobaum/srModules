@@ -1,0 +1,26 @@
+# Local-only documentation (do not push to remote)
+README.md
+docs/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local capture / debug logs (never commit personal traffic logs!)
+*.har
+*.pcap
+*.pcapng
+*.log
+captures/
+debug/
+.env
+.env.*

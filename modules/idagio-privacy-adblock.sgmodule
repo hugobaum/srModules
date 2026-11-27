@@ -1,0 +1,53 @@
+#!name=IDAGIO Privacy & AdBlock
+#!desc=IDAGIO 隱私保護（封鎖官方隱私政策列出的 Firebase/Segment/Braze/AppsFlyer 等追蹤 SDK）＋ api.idagio.com 安全 JSON 促銷過濾與可選去敏診斷腳本
+#!system=ios
+
+[Rule]
+# ==============================================================================
+# 1. 已查證之 IDAGIO 行動端第三方分析、歸因與行銷追蹤 SDK（安全封鎖，不影響串流）
+#    來源依據：IDAGIO 官方隱私政策（Firebase/Crashlytics、Google Analytics、
+#    Segment、Braze、AppsFlyer 與廣告歸因測量平台）
+#    注意：絕不整域封鎖 api.idagio.com 或 idagio.com 主站。
+# ==============================================================================
+
+# Firebase Analytics / Crashlytics / Google Analytics
+DOMAIN,app-measurement.com,REJECT
+DOMAIN-SUFFIX,app-analytics-services.com,REJECT
+DOMAIN-SUFFIX,google-analytics.com,REJECT
+DOMAIN,analytics.google.com,REJECT
+DOMAIN,firebase-settings.crashlytics.com,REJECT
+DOMAIN,firebaselogging.googleapis.com,REJECT
+DOMAIN,firebaselogging-pa.googleapis.com,REJECT
+
+# Segment 行為事件採集
+DOMAIN,api.segment.io,REJECT
+DOMAIN,cdn.segment.com,REJECT
+DOMAIN-SUFFIX,segmentapis.com,REJECT
+
+# Braze 行銷與用戶畫像
+DOMAIN-SUFFIX,braze.com,REJECT
+DOMAIN-SUFFIX,braze.eu,REJECT
+DOMAIN-SUFFIX,appboycdn.com,REJECT
+
+# AppsFlyer 歸因與廣告測量平台
+DOMAIN-SUFFIX,appsflyer.com,REJECT
+DOMAIN-SUFFIX,appsflyersdk.com,REJECT
+DOMAIN-SUFFIX,doubleclick.net,REJECT
+DOMAIN-SUFFIX,googleadservices.com,REJECT
+DOMAIN-SUFFIX,googlesyndication.com,REJECT
+DOMAIN,pixel.facebook.com,REJECT
+DOMAIN,an.facebook.com,REJECT
+
+[Script]
+# ==============================================================================
+# 2. IDAGIO API 安全 JSON 促銷項目過濾 ＋ 可選除錯結構檢查
+#    - 僅處理 api.idagio.com 的 JSON 回應，不觸碰二進位音訊流。
+#    - 僅過濾明確標記為 ad/promo/upsell/interstitial/announcement 的佇列物件。
+#    - 若免費版第一方推銷語音仍出現，請將 debug=false 改為 debug=true，
+#      播放至出現推銷語音後查看 Shadowrocket Script Log（僅輸出路徑與去敏鍵名）。
+# ==============================================================================
+idagio-adblock = type=http-response,pattern=^https:\/\/api\.idagio\.com\/v\d+(?:\.\d+)?\/(?!auth|login|oauth|token|user|account|subscription|payment|checkout|me\/subscription).*$,requires-body=1,max-size=-1,script-path=https://raw.githubusercontent.com/hugobaum/srModules/main/scripts/idagio-adblock.js,argument=debug=false
+
+[MITM]
+# 若目前 iOS IDAGIO 版本對 api.idagio.com 啟用 SSL Pinning 導致無法連線，請註解掉此行改用純 [Rule] 層
+hostname = %APPEND% api.idagio.com

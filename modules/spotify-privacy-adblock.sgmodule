@@ -1,0 +1,48 @@
+#!name=Spotify Privacy & Visual AdBlock
+#!desc=Spotify 去追蹤、去遙測與視覺橫幅／贊助位過濾（不誤封音樂 CDN、不偽造會員配置；若新版 iOS Spotify 觸發憑證綁定導致無法連線，請移除 [MITM] 與 [URL Rewrite] 僅保留 [Rule]）
+#!system=ios
+
+[Rule]
+# ==============================================================================
+# 1. 安全封鎖層：Spotify 獨立廣告事件、追蹤與崩潰日誌網域（不影響音樂播放）
+#    注意：絕不封鎖 audio-fa.scdn.co、audio4-fa.scdn.co、
+#    audio-ak-spotify-com.akamaized.net 或整個 spclient.wg.spotify.com。
+# ==============================================================================
+DOMAIN,adeventtracker.spotify.com,REJECT
+DOMAIN,ads-fa.spotify.com,REJECT
+DOMAIN,analytics.spotify.com,REJECT
+DOMAIN,crashdump.spotify.com,REJECT
+DOMAIN,log.spotify.com,REJECT
+DOMAIN,log2.spotify.com,REJECT
+
+# Spotify 內嵌與外部常見追蹤／廣告聯播網
+DOMAIN-SUFFIX,doubleclick.net,REJECT
+DOMAIN-SUFFIX,googlesyndication.com,REJECT
+DOMAIN-SUFFIX,googleadservices.com,REJECT
+DOMAIN-SUFFIX,moatads.com,REJECT
+DOMAIN-SUFFIX,scorecardresearch.com,REJECT
+DOMAIN-SUFFIX,adnxs.com,REJECT
+DOMAIN-SUFFIX,adjust.com,REJECT
+DOMAIN-SUFFIX,appsflyer.com,REJECT
+DOMAIN-SUFFIX,appsflyersdk.com,REJECT
+DOMAIN,api.branch.io,REJECT
+DOMAIN,api2.branch.io,REJECT
+
+[URL Rewrite]
+# ==============================================================================
+# 2. MITM 路徑層：攔截 spclient 的視覺廣告、贊助推薦與廣告設定請求
+#    使用 reject-dict 回傳空 JSON（{}），降低客戶端解析失敗重試或卡死的風險。
+#    備註：不觸碰 bootstrap/v1/bootstrap 與 user-customization-service/v1/customize。
+# ==============================================================================
+^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/ads\/ _ reject-dict
+^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/ad-logic\/ _ reject-dict
+^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/sponsored-recommendations\/ _ reject-dict
+^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/.+(ad_slot|\/banners\/) _ reject-dict
+
+# [選用遙測封鎖] gabo-receiver-service 為 Spotify 行為事件遙測端點；
+# 部分 iOS 版本封鎖後可能導致切歌停頓，若需封鎖請取消下方註解並實機測試：
+# ^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/gabo-receiver-service\/ _ reject-200
+
+[MITM]
+# 若目前 iOS Spotify 版本因 SSL Pinning 無法連線，請註解掉此行改用純 [Rule] 層
+hostname = %APPEND% spclient.wg.spotify.com, *-spclient.spotify.com

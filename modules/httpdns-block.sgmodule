@@ -1,0 +1,45 @@
+#!name=HTTPDNS Block
+#!desc=封鎖常見 App 內建 HTTPDNS 端點，強迫回退至系統 DNS 以防止繞過 Shadowrocket 去廣告與隱私規則
+#!system=ios
+
+[Rule]
+# Alibaba / Taobao / Youku / Eleme
+DOMAIN-SUFFIX,httpdns.alicdn.com,REJECT
+DOMAIN,httpdns-api.aliyuncs.com,REJECT
+DOMAIN,httpdns-sc.aliyuncs.com,REJECT
+DOMAIN,httpdns.danuoyi.tbcache.com,REJECT
+IP-CIDR,203.107.1.1/24,REJECT,no-resolve
+
+# Tencent / WeChat / QQ
+DOMAIN,dns.weixin.qq.com.cn,REJECT
+DOMAIN,dns.weixin.qq.com,REJECT
+DOMAIN,httpdns.qq.com,REJECT
+
+# ByteDance / Douyin / Volcengine
+DOMAIN,httpdns.volcengineapi.com,REJECT
+DOMAIN,dig.bdurl.net,REJECT
+DOMAIN,httpdns.bcelive.com,REJECT
+
+# NetEase / Bilibili / Baidu / Meituan / JD / Weibo
+DOMAIN,httpdns.n.netease.com,REJECT
+DOMAIN,httpdns.music.163.com,REJECT
+DOMAIN,httpdns.bilivideo.com,REJECT
+DOMAIN,httpdns.biliapi.net,REJECT
+DOMAIN,httpdns.baidu.com,REJECT
+DOMAIN,httpsdns.baidu.com,REJECT
+DOMAIN,httpdns.baidubce.com,REJECT
+IP-CIDR,180.76.76.200/32,REJECT,no-resolve
+DOMAIN,httpdns.meituan.com,REJECT
+DOMAIN,httpdns.jd.com,REJECT
+DOMAIN,dns.jd.com,REJECT
+DOMAIN,httpdns.weibo.cn,REJECT
+DOMAIN,httpdns.calorietech.com,REJECT
+
+# 手機廠商與 CDN 內建 HTTPDNS
+DOMAIN,httpdns.push.oppomobile.com,REJECT
+DOMAIN,httpdns.ocloud.oppomobile.com,REJECT
+DOMAIN,httpdns.c.cdnhwc2.com,REJECT
+DOMAIN,httpdns.c.cdnhwc1.com,REJECT
+DOMAIN,httpdns.ocloud.heytapmobi.com,REJECT
+DOMAIN,httpdns.browser.miui.com,REJECT
+DOMAIN,httpdns.vivo.com.cn,REJECT

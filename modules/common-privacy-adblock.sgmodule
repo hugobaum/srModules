@@ -1,0 +1,165 @@
+#!name=Common AdBlock & Privacy (iOS)
+#!desc=通用 iOS 去廣告、防追蹤、防歸因與遙測封鎖（純網域規則層，免 MITM、低誤殺，避開推播與深層連結核心服務）
+#!system=ios
+
+[Rule]
+# ==============================================================================
+# 1. 行動廣告聯播網（Google / Meta / Amazon / 程式化廣告 / 行動 SDK）
+# ==============================================================================
+DOMAIN-SUFFIX,doubleclick.net,REJECT
+DOMAIN-SUFFIX,googlesyndication.com,REJECT
+DOMAIN-SUFFIX,googleadservices.com,REJECT
+DOMAIN-SUFFIX,adservice.google.com,REJECT
+DOMAIN-SUFFIX,2mdn.net,REJECT
+DOMAIN-SUFFIX,googleadsserving.cn,REJECT
+DOMAIN,ads.youtube.com,REJECT
+
+DOMAIN,an.facebook.com,REJECT
+DOMAIN,ads.facebook.com,REJECT
+DOMAIN,pixel.facebook.com,REJECT
+DOMAIN,analytics.facebook.com,REJECT
+
+DOMAIN-SUFFIX,amazon-adsystem.com,REJECT
+DOMAIN-SUFFIX,criteo.com,REJECT
+DOMAIN-SUFFIX,criteo.net,REJECT
+DOMAIN-SUFFIX,taboola.com,REJECT
+DOMAIN-SUFFIX,outbrain.com,REJECT
+DOMAIN-SUFFIX,adnxs.com,REJECT
+DOMAIN-SUFFIX,pubmatic.com,REJECT
+DOMAIN-SUFFIX,openx.net,REJECT
+DOMAIN-SUFFIX,rubiconproject.com,REJECT
+DOMAIN-SUFFIX,casalemedia.com,REJECT
+DOMAIN-SUFFIX,adsrvr.org,REJECT
+DOMAIN-SUFFIX,moatads.com,REJECT
+DOMAIN-SUFFIX,doubleverify.com,REJECT
+DOMAIN-SUFFIX,adsafeprotected.com,REJECT
+DOMAIN-SUFFIX,smartadserver.com,REJECT
+DOMAIN-SUFFIX,bidswitch.net,REJECT
+DOMAIN-SUFFIX,sharethrough.com,REJECT
+DOMAIN-SUFFIX,indexww.com,REJECT
+DOMAIN-SUFFIX,3lift.com,REJECT
+
+# 常見 iOS App 內嵌廣告 SDK
+DOMAIN-SUFFIX,unityads.unity3d.com,REJECT
+DOMAIN-SUFFIX,applovin.com,REJECT
+DOMAIN-SUFFIX,applvn.com,REJECT
+DOMAIN-SUFFIX,ironsrc.com,REJECT
+DOMAIN-SUFFIX,supersonicads.com,REJECT
+DOMAIN-SUFFIX,vungle.com,REJECT
+DOMAIN-SUFFIX,chartboost.com,REJECT
+DOMAIN-SUFFIX,inmobi.com,REJECT
+DOMAIN-SUFFIX,mopub.com,REJECT
+DOMAIN-SUFFIX,mintegral.com,REJECT
+DOMAIN-SUFFIX,rayjump.com,REJECT
+DOMAIN-SUFFIX,adcolony.com,REJECT
+DOMAIN-SUFFIX,tapjoy.com,REJECT
+DOMAIN-SUFFIX,fyber.com,REJECT
+DOMAIN-SUFFIX,inner-active.mobi,REJECT
+DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT
+DOMAIN-SUFFIX,pangolin-sdk-toutiao-b.com,REJECT
+DOMAIN-SUFFIX,pangle-global.io,REJECT
+DOMAIN-SUFFIX,pangle.io,REJECT
+DOMAIN-SUFFIX,ads.tiktok.com,REJECT
+DOMAIN-SUFFIX,ads-sg.tiktok.com,REJECT
+
+# 常見中文行動 App 廣告聯盟（廣點通／穿山甲／百度／快手／小米／OPPO）
+DOMAIN,e.qq.com,REJECT
+DOMAIN-SUFFIX,gdt.qq.com,REJECT
+DOMAIN-SUFFIX,adsmind.gdtimg.com,REJECT
+DOMAIN-SUFFIX,mobads.baidu.com,REJECT
+DOMAIN-SUFFIX,cpro.baidu.com,REJECT
+DOMAIN-SUFFIX,pos.baidu.com,REJECT
+DOMAIN-SUFFIX,hm.baidu.com,REJECT
+DOMAIN,open.e.kuaishou.com,REJECT
+DOMAIN-SUFFIX,ad.xiaomi.com,REJECT
+DOMAIN-SUFFIX,adx.ads.oppomobile.com,REJECT
+DOMAIN-SUFFIX,adsfs.oppomobile.com,REJECT
+
+# ==============================================================================
+# 2. 行動歸因與跨 App 追蹤 SDK（避開 app.link / bnc.lt 等使用者點擊短鏈）
+# ==============================================================================
+DOMAIN-SUFFIX,appsflyer.com,REJECT
+DOMAIN-SUFFIX,appsflyersdk.com,REJECT
+DOMAIN-SUFFIX,adjust.com,REJECT
+DOMAIN-SUFFIX,adjust.io,REJECT
+DOMAIN-SUFFIX,adjust.net.in,REJECT
+DOMAIN-SUFFIX,adjust.world,REJECT
+DOMAIN,api.branch.io,REJECT
+DOMAIN,api2.branch.io,REJECT
+DOMAIN,api3.branch.io,REJECT
+DOMAIN-SUFFIX,kochava.com,REJECT
+DOMAIN-SUFFIX,singular.net,REJECT
+DOMAIN-SUFFIX,tenjin.io,REJECT
+DOMAIN-SUFFIX,tenjin.com,REJECT
+DOMAIN-SUFFIX,airbridge.io,REJECT
+
+# ==============================================================================
+# 3. 行為分析、埋點、行銷畫像與錯誤遙測 SDK
+#    注意：刻意不封鎖 fcm.googleapis.com / firebaseinstallations.googleapis.com
+#    與 firebaseremoteconfig.googleapis.com，以免影響推播通知與 App 啟動。
+# ==============================================================================
+DOMAIN,app-measurement.com,REJECT
+DOMAIN-SUFFIX,app-analytics-services.com,REJECT
+DOMAIN-SUFFIX,google-analytics.com,REJECT
+DOMAIN,analytics.google.com,REJECT
+DOMAIN,firebase-settings.crashlytics.com,REJECT
+DOMAIN,firebaselogging.googleapis.com,REJECT
+DOMAIN,firebaselogging-pa.googleapis.com,REJECT
+
+# Segment / Braze / Amplitude / Mixpanel / Flurry
+DOMAIN,api.segment.io,REJECT
+DOMAIN,cdn.segment.com,REJECT
+DOMAIN-SUFFIX,segmentapis.com,REJECT
+DOMAIN-SUFFIX,braze.com,REJECT
+DOMAIN-SUFFIX,braze.eu,REJECT
+DOMAIN-SUFFIX,appboycdn.com,REJECT
+DOMAIN,api.amplitude.com,REJECT
+DOMAIN,api2.amplitude.com,REJECT
+DOMAIN,api.eu.amplitude.com,REJECT
+DOMAIN,api.mixpanel.com,REJECT
+DOMAIN,api-js.mixpanel.com,REJECT
+DOMAIN,api-eu.mixpanel.com,REJECT
+DOMAIN,decide.mixpanel.com,REJECT
+DOMAIN,data.flurry.com,REJECT
+DOMAIN,ads.flurry.com,REJECT
+
+# 第三方遙測、工作階段錄影與監控埋點
+DOMAIN-SUFFIX,scorecardresearch.com,REJECT
+DOMAIN-SUFFIX,quantserve.com,REJECT
+DOMAIN-SUFFIX,demdex.net,REJECT
+DOMAIN-SUFFIX,omtrdc.net,REJECT
+DOMAIN-SUFFIX,bluekai.com,REJECT
+DOMAIN-SUFFIX,krxd.net,REJECT
+DOMAIN-SUFFIX,hotjar.com,REJECT
+DOMAIN-SUFFIX,hotjar.io,REJECT
+DOMAIN,rs.fullstory.com,REJECT
+DOMAIN-SUFFIX,ingest.sentry.io,REJECT
+DOMAIN-SUFFIX,ingest.us.sentry.io,REJECT
+DOMAIN-SUFFIX,ingest.de.sentry.io,REJECT
+DOMAIN,notify.bugsnag.com,REJECT
+DOMAIN,sessions.bugsnag.com,REJECT
+DOMAIN,mobile-collector.newrelic.com,REJECT
+DOMAIN-SUFFIX,browser-intake-datadoghq.com,REJECT
+DOMAIN-SUFFIX,browser-intake-datadoghq.eu,REJECT
+DOMAIN,in.appcenter.ms,REJECT
+DOMAIN-SUFFIX,clarity.ms,REJECT
+DOMAIN-SUFFIX,umeng.com,REJECT
+DOMAIN-SUFFIX,umengcloud.com,REJECT
+DOMAIN-SUFFIX,sensorsdata.cn,REJECT
+DOMAIN-SUFFIX,growingio.com,REJECT
+DOMAIN-SUFFIX,talkingdata.com,REJECT
+DOMAIN-SUFFIX,talkingdata.net,REJECT
+DOMAIN,log-va.tiktokv.com,REJECT
+DOMAIN,mon-va.tiktokv.com,REJECT
+DOMAIN,log.snssdk.com,REJECT
+DOMAIN,mon.snssdk.com,REJECT
+
+# ==============================================================================
+# 4. Apple 廣告與指標遙測（不影響 iCloud、App Store、APNs 推播與證書驗證）
+# ==============================================================================
+DOMAIN,iadsdk.apple.com,REJECT
+DOMAIN,metrics.icloud.com,REJECT
+DOMAIN,metrics.mzstatic.com,REJECT
+DOMAIN,securemetrics.apple.com,REJECT
+DOMAIN,supportmetrics.apple.com,REJECT
+DOMAIN,xp.apple.com,REJECT
