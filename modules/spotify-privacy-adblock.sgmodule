@@ -31,17 +31,17 @@ DOMAIN,api2.branch.io,REJECT
 [URL Rewrite]
 # ==============================================================================
 # 2. MITM 路徑層：攔截 spclient 的視覺廣告、贊助推薦與廣告設定請求
-#    使用 reject-dict 回傳空 JSON（{}），降低客戶端解析失敗重試或卡死的風險。
+#    使用標準 - reject-dict 回傳空 JSON（{}），降低客戶端解析失敗重試或卡死的風險。
 #    備註：不觸碰 bootstrap/v1/bootstrap 與 user-customization-service/v1/customize。
 # ==============================================================================
-^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/ads\/ _ reject-dict
-^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/ad-logic\/ _ reject-dict
-^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/sponsored-recommendations\/ _ reject-dict
-^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/.+(ad_slot|\/banners\/) _ reject-dict
+^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/ads\/.* - reject-dict
+^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/ad-logic\/.* - reject-dict
+^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/sponsored-recommendations\/.* - reject-dict
+^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/.+(ad_slot|\/banners\/).* - reject-dict
 
 # [選用遙測封鎖] gabo-receiver-service 為 Spotify 行為事件遙測端點；
 # 部分 iOS 版本封鎖後可能導致切歌停頓，若需封鎖請取消下方註解並實機測試：
-# ^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/gabo-receiver-service\/ _ reject-200
+# ^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/gabo-receiver-service\/.* - reject-200
 
 [MITM]
 # 若目前 iOS Spotify 版本因 SSL Pinning 無法連線，請註解掉此行改用純 [Rule] 層

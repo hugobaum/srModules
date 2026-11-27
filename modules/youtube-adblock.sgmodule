@@ -3,10 +3,8 @@
 #!system=ios
 
 [Rule]
-# 1. 阻斷 YouTube QUIC（UDP 443），強迫回退至 TCP/HTTPS 讓 MITM 與過濾腳本生效
-AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,UDP),(DEST-PORT,443)),REJECT-NO-DROP
-AND,((DOMAIN-SUFFIX,youtubei.googleapis.com),(PROTOCOL,UDP),(DEST-PORT,443)),REJECT-NO-DROP
-AND,((DOMAIN-SUFFIX,youtube.com),(PROTOCOL,UDP),(DEST-PORT,443)),REJECT-NO-DROP
+# 1. 阻斷 UDP 443（HTTP/3 QUIC），以 REJECT-NO-DROP 強迫優雅回退至 TCP/HTTPS 讓 MITM 與過濾腳本生效
+AND,((PROTOCOL,UDP),(DST-PORT,443)),REJECT-NO-DROP
 
 # 2. 封鎖 YouTube 關聯第三方廣告與追蹤網域
 DOMAIN,googleads.g.doubleclick.net,REJECT
@@ -18,17 +16,17 @@ DOMAIN,s0.2mdn.net,REJECT
 DOMAIN,ads.youtube.com,REJECT
 
 [URL Rewrite]
-# 3. 溫和攔截明確廣告與廣告統計端點（使用 reject-200 回傳空 200，同時相容空 Protobuf 與空文字）
+# 3. 溫和攔截明確廣告、片中插播觸發接口與廣告統計端點（使用標準 - reject-200 回傳空 200，相容空 Protobuf）
 #    注意：刻意不攔截 /api/stats/watchtime 與 /api/stats/playback，以維持觀看紀錄與續播進度。
-^https?:\/\/(www|m|s|music)\.youtube\.com\/(pagead|ptracking|get_midroll_info|api\/stats\/ads|api\/stats\/atr) _ reject-200
-^https?:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/player\/ad_break _ reject-200
-^https?:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/log_event _ reject-200
-^https?:\/\/[\w-]+\.googlevideo\.com\/initplayback.+&adformat= _ reject-200
+^https?:\/\/(www|m|s|music)\.youtube\.com\/(pagead|ptracking|get_midroll_info|api\/stats\/ads|api\/stats\/atr).* - reject-200
+^https?:\/\/(youtubei\.googleapis\.com|(www|m|music)\.youtube\.com)\/youtubei\/v1\/player\/ad_break.* - reject-200
+^https?:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/log_event.* - reject-200
+^https?:\/\/[\w-]+\.googlevideo\.com\/initplayback.+&adformat=.* - reject-200
 
 [Script]
 # 4. 過濾 youtubei 回應中的廣告欄位（支援 Binary Protobuf 與 JSON）
 #    需排查時可改為 argument=debug=true
-youtube-adblock = type=http-response,pattern=^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(player|next|browse|search|reel\/reel_watch_sequence|get_watch)(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/hugobaum/srModules/main/scripts/youtube-adblock.js,argument=debug=false
+youtube-adblock = type=http-response,pattern=^https:\/\/(youtubei\.googleapis\.com|(www|m|music)\.youtube\.com)\/youtubei\/v1\/(player|next|browse|search|reel\/reel_watch_sequence|get_watch)(\?.*)?$,requires-body=1,max-size=-1,binary-body-mode=1,script-path=https://raw.githubusercontent.com/hugobaum/srModules/main/scripts/youtube-adblock.js,argument=debug=false
 
 [MITM]
 hostname = %APPEND% youtubei.googleapis.com, *.googlevideo.com, www.youtube.com, m.youtube.com, s.youtube.com, music.youtube.com

@@ -26,6 +26,22 @@
   var TAG_AD_SLOT_RENDERER = 424701016;
   var TAG_ELEMENT_RENDERER = 153515154;
 
+  // PlayerResponse 核心必保留欄位編號（絕不剔除）
+  var PLAYER_CORE_FIELDS = {
+    1: true,  // responseContext
+    2: true,  // playabilityStatus
+    4: true,  // streamingData
+    9: true,  // playbackTracking（觀看紀錄 watchtime / playback / qoe）
+    10: true, // captions（字幕 timedtext）
+    11: true  // videoDetails
+  };
+
+  // PlayerResponse 已驗證之廣告排程頂層欄位編號（涵蓋片頭、片中、片尾廣告）
+  var PLAYER_AD_FIELDS = {
+    7: true,  // adPlacements
+    42: true  // adSlots
+  };
+
   // 核心保護特徵（小寫 ASCII）：以二進位 Protobuf 實際包含的字串值與 JSON 鍵名為主
   // 只要欄位內出現以下任一字串，絕不整欄剔除（避免誤殺觀看紀錄、字幕與播放回報）
   var PROTECTED_CORE_MARKERS = [
@@ -406,17 +422,63 @@
   // Protobuf 廣告過濾邏輯
   // ---------------------------------------------------------------------------
 
+  // 嚴格辨識一個 Protobuf 訊息是否為 PlayerResponse（避免在 get_watch 巢狀結構中誤判其他訊息）
+  function isPlayerResponseFields(fields) {
+    if (!fields || fields.length < 2) return false;
+    var hasResponseContext = false;
+    var hasCorePlaybackPayload = false;
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (f.wireType !== 2 || f.payload.length === 0) continue;
+      if (f.fieldNumber === 1) {
+        hasResponseContext = true;
+      } else if (f.fieldNumber === 4 || f.fieldNumber === 9 || f.fieldNumber === 11) {
+        if (
+          containsAsciiMarker(f.payload, "googlevideo.com/videoplayback") ||
+          containsAsciiMarker(f.payload, "api/stats/watchtime") ||
+          containsAsciiMarker(f.payload, "api/stats/playback") ||
+          containsAsciiMarker(f.payload, "api/stats/qoe") ||
+          containsAsciiMarker(f.payload, "manifest.googlevideo.com") ||
+          containsAsciiMarker(f.payload, "video/mp4") ||
+          containsAsciiMarker(f.payload, "audio/mp4") ||
+          containsAsciiMarker(f.payload, "video/webm")
+        ) {
+          hasCorePlaybackPayload = true;
+        }
+      }
+    }
+    return hasResponseContext && hasCorePlaybackPayload;
+  }
+
   function filterPlayerProtobuf(buf, stats) {
     var fields = decodeFields(buf);
-    if (!fields) return { changed: false, bytes: buf };
+    if (!fields || !isPlayerResponseFields(fields)) {
+      return { changed: false, bytes: buf };
+    }
 
     var chunks = [];
     var changed = false;
 
     for (var i = 0; i < fields.length; i++) {
       var f = fields[i];
+      if (DEBUG) {
+        stats.seenPlayerFields.push(f.fieldNumber);
+      }
       if (f.wireType === 2 && f.payload.length > 0) {
-        if (!hasProtectedCoreMarker(f.payload) && hasPlayerAdMarker(f.payload)) {
+        // 核心播放／字幕／觀看紀錄欄位絕不剔除
+        if (PLAYER_CORE_FIELDS[f.fieldNumber]) {
+          chunks.push(f.fullRaw);
+          continue;
+        }
+        // 已驗證的片頭／片中廣告排程欄位（7: adPlacements, 42: adSlots）直接剔除，
+        // 避免片中時間點無網址字串或內嵌 adPlayerResponse 含 qoe 而漏攔
+        if (PLAYER_AD_FIELDS[f.fieldNumber]) {
+          changed = true;
+          stats.removedPlayerFields.push(f.fieldNumber);
+          continue;
+        }
+        // 其他非核心欄位（如 playerAds 等）：命中廣告特徵即剔除
+        if (hasPlayerAdMarker(f.payload)) {
           changed = true;
           stats.removedPlayerFields.push(f.fieldNumber);
           continue;
@@ -554,9 +616,14 @@
     return false;
   }
 
-  function filterGetWatchProtobuf(buf, stats) {
+  function filterGetWatchProtobuf(buf, depth, stats) {
+    if (depth > 4 || buf.length < 16) return { changed: false, bytes: buf };
     var fields = decodeFields(buf);
     if (!fields) return { changed: false, bytes: buf };
+
+    if (isPlayerResponseFields(fields)) {
+      return filterPlayerProtobuf(buf, stats);
+    }
 
     var chunks = [];
     var changed = false;
@@ -568,19 +635,25 @@
         continue;
       }
 
+      var subFields = decodeFields(f.payload);
       var subRes;
-      if (
-        hasProtectedCoreMarker(f.payload) ||
-        containsAsciiMarker(f.payload, "googlevideo.com/videoplayback")
-      ) {
-        // 含播放器核心欄位（PlayerResponse 分支）
+      if (subFields && isPlayerResponseFields(subFields)) {
         subRes = filterPlayerProtobuf(f.payload, stats);
+      } else if (
+        depth < 3 &&
+        subFields &&
+        (containsAsciiMarker(f.payload, "googlevideo.com/videoplayback") ||
+          containsAsciiMarker(f.payload, "api/stats/watchtime") ||
+          containsAsciiMarker(f.payload, "api/stats/playback"))
+      ) {
+        // PlayerResponse 位於更深一層容器時繼續往下定位
+        subRes = filterGetWatchProtobuf(f.payload, depth + 1, stats);
       } else {
         // 推薦列／WatchNext 分支
         subRes = filterFeedProtobuf(f.payload, 1, false, stats);
       }
 
-      if (subRes.changed) {
+      if (subRes && subRes.changed) {
         changed = true;
         chunks.push(rebuildLengthDelimitedField(f.rawTag, subRes.bytes));
       } else {
@@ -657,15 +730,17 @@
     }
 
     var stats = {
+      seenPlayerFields: [],
       removedPlayerFields: [],
       removedFeedItems: 0,
       removedJsonKeys: []
     };
 
-    var hasBodyBytesProp = typeof $response.bodyBytes !== "undefined" && $response.bodyBytes !== null;
-    var hasBodyProp = typeof $response.body !== "undefined" && $response.body !== null;
+    var bodyBin = typeof $response.body !== "undefined" && $response.body !== null ? toUint8Array($response.body) : null;
+    var bodyBytesBin = typeof $response.bodyBytes !== "undefined" && $response.bodyBytes !== null ? toUint8Array($response.bodyBytes) : null;
 
-    var rawBytes = toUint8Array(hasBodyBytesProp ? $response.bodyBytes : null) || toUint8Array(hasBodyProp ? $response.body : null);
+    var useBodyBytesOut = Boolean(bodyBytesBin && !bodyBin);
+    var rawBytes = bodyBin || bodyBytesBin;
     var rawText = !rawBytes && typeof $response.body === "string" ? $response.body : null;
 
     // 路徑 A：文字 JSON 模式
@@ -702,7 +777,7 @@
           logDebug(
             "endpoint=" + endpoint + " mode=json-bytes removedKeys=" + stats.removedJsonKeys.join(",") + " removedItems=" + stats.removedFeedItems
           );
-          if (hasBodyBytesProp && !hasBodyProp) {
+          if (useBodyBytesOut) {
             $done({ bodyBytes: outJsonBytes.buffer });
           } else {
             $done({ body: outJsonBytes });
@@ -721,7 +796,7 @@
     if (endpoint === "player") {
       protoRes = filterPlayerProtobuf(rawBytes, stats);
     } else if (endpoint === "get_watch") {
-      protoRes = filterGetWatchProtobuf(rawBytes, stats);
+      protoRes = filterGetWatchProtobuf(rawBytes, 0, stats);
     } else {
       protoRes = filterFeedProtobuf(rawBytes, 0, endpoint === "reel", stats);
     }
@@ -730,7 +805,9 @@
       logDebug(
         "endpoint=" +
           endpoint +
-          " mode=protobuf removedPlayerFields=[" +
+          " mode=protobuf seen=[" +
+          stats.seenPlayerFields.join(",") +
+          "] removedPlayerFields=[" +
           stats.removedPlayerFields.join(",") +
           "] removedFeedItems=" +
           stats.removedFeedItems +
@@ -739,7 +816,7 @@
           "->" +
           protoRes.bytes.length
       );
-      if (hasBodyBytesProp && !hasBodyProp) {
+      if (useBodyBytesOut) {
         $done({ bodyBytes: protoRes.bytes.buffer });
       } else {
         $done({ body: protoRes.bytes });
@@ -747,7 +824,14 @@
       return;
     }
 
-    logDebug("endpoint=" + endpoint + " mode=protobuf unchanged size=" + rawBytes.length);
+    logDebug(
+      "endpoint=" +
+        endpoint +
+        " mode=protobuf unchanged seen=[" +
+        stats.seenPlayerFields.join(",") +
+        "] size=" +
+        rawBytes.length
+    );
     $done({});
   } catch (err) {
     logDebug("error=" + (err && err.message ? err.message : String(err)));
